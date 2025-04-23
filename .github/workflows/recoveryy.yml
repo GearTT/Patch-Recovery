@@ -1,0 +1,41 @@
+name: RECOVERY
+
+on:
+  workflow_dispatch:
+    inputs:
+      RECOVERY_URL:
+        description: 'Direct link to recovery.img or recovery.img.lz4'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Download recovery image
+        run: |
+          wget "${{ github.event.inputs.RECOVERY_URL }}" -O recovery.img.lz4
+
+      - name: Convert .lz4 to .img (if needed)
+        run: |
+          sudo apt-get install -y lz4
+          lz4 -d recovery.img.lz4 recovery.img || echo "Skipping lz4 decompression if already in .img"
+
+      - name: Patch recovery
+        run: |
+          curl -sL https://raw.githubusercontent.com/phhusson/treble_experimentations/master/scripts/avbtool/download.sh | bash
+          chmod +x patch.sh
+          ./patch.sh recovery.img
+
+      - name: Pack .tar for Odin
+        run: |
+          tar -H ustar -cf recovery_patched.tar recovery.img
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Patched-Recovery
+          path: recovery_patched.tar
